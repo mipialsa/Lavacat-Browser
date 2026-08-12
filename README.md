@@ -1,3 +1,4 @@
+<img width="200" height="200" alt="1000486622" src="https://github.com/user-attachments/assets/3d8562f0-d44e-44dd-83bf-d9e015e64cdf" />
 # Lavacat Browser
 
 Lavacat Browser es un navegador para Windows basado en Thorium Browser, diseñado para ofrecer una experiencia rápida, privada y personalizable desde el primer inicio.

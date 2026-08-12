@@ -1,0 +1,103 @@
+; ==========================================
+; CONFIGURACIÓN DE NOMBRE E ICONO PERSONALIZADO
+; ==========================================
+!define NOMBRE_NAVEGADOR "Lavacat Browser"
+!define ARCHIVO_ICONO "1000486623.ico"
+
+OutFile "Instalador_Lavacat_Browser.exe"
+Name "${NOMBRE_NAVEGADOR}"
+
+; RUTA PREDETERMINADA DE INSTALACIÓN
+InstallDir "$PROGRAMFILES64\${NOMBRE_NAVEGADOR}"
+
+; Solicitar privilegios de Administrador (Obligatorio para escribir en Program Files)
+RequestExecutionLevel admin
+
+!include "MUI2.nsh"
+!define MUI_ICON "${ARCHIVO_ICONO}"
+!define MUI_UNICON "${ARCHIVO_ICONO}"
+
+; PÁGINAS DEL INSTALADOR (Añadida la página de elegir ruta)
+!insertmacro MUI_PAGE_WELCOME
+!insertmacro MUI_PAGE_DIRECTORY        ; <-- Esta línea muestra la pantalla para elegir carpeta
+!insertmacro MUI_PAGE_INSTFILES
+!insertmacro MUI_PAGE_FINISH
+
+; Páginas del desinstalador
+!insertmacro MUI_UNPAGE_WELCOME
+!insertmacro MUI_UNPAGE_INSTFILES
+!insertmacro MUI_UNPAGE_FINISH
+
+!insertmacro MUI_LANGUAGE "Spanish"
+
+; --- SECCIÓN DE INSTALACIÓN ---
+Section "Instalar Navegador" SecThorium
+
+  ; 1. Crear el directorio elegido por el usuario e incluir el icono allí
+  SetOutPath "$INSTDIR"
+  File "${ARCHIVO_ICONO}"
+
+  ; 2. Extraer e instalar los binarios del navegador en la ruta elegida ($INSTDIR)
+  SetOutPath "$TEMP"
+  File "thorium_setup.exe"
+  DetailPrint "Instalando motor de ${NOMBRE_NAVEGADOR}..."
+  
+  ; Forzamos al instalador base a meterse en la carpeta que seleccionó el usuario
+  ExecWait '"$TEMP\thorium_setup.exe" /silent /install --install-dir="$INSTDIR"'
+  Delete "$TEMP\thorium_setup.exe"
+
+  ; 3. Copiar la carpeta de perfil (con uBlock, Privacy Badger, Violentmonkey y el script)
+  ; El perfil de usuario SIEMPRE debe ir en AppData para que Chromium funcione bien
+  SetOutPath "$LOCALAPPDATA\Thorium\User Data"
+  DetailPrint "Configurando perfil y extensiones..."
+  File /r "User Data\*.*"
+
+  ; 4. Registro e instalación forzada de las 3 Extensiones
+  DetailPrint "Inyectando extensiones en el sistema..."
+  WriteRegStr HKLM "Software\Wow6432Node\Google\Chrome\Extensions\cjpalhdlnbpafiamejdnhcphjbkeiagm" "update_url" "https://google.com"
+  WriteRegStr HKLM "Software\Wow6432Node\Google\Chrome\Extensions\pkehgijclgfghdconhihgpnofmmoofoa" "update_url" "https://google.com"
+  WriteRegStr HKLM "Software\Wow6432Node\Google\Chrome\Extensions\jinjgcalioihgjonmglokifelgocgbeb" "update_url" "https://google.com"
+
+  ; 5. Crear accesos directos personalizados apuntando a la nueva ruta
+  DetailPrint "Creando accesos directos de ${NOMBRE_NAVEGADOR}..."
+  Delete "$DESKTOP\Thorium.lnk"
+  Delete "$SMPROGRAMS\Thorium.lnk"
+  
+  CreateShortcut "$DESKTOP\${NOMBRE_NAVEGADOR}.lnk" "$INSTDIR\thorium.exe" "" "$INSTDIR\${ARCHIVO_ICONO}" 0
+  CreateShortcut "$SMPROGRAMS\${NOMBRE_NAVEGADOR}.lnk" "$INSTDIR\thorium.exe" "" "$INSTDIR\${ARCHIVO_ICONO}" 0
+
+  ; 6. Registrar desinstalador limpio en el Panel de Control
+  WriteUninstaller "$INSTDIR\Desinstalar.exe"
+
+  WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\LavacatBrowser" "DisplayName" "${NOMBRE_NAVEGADOR}"
+  WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\LavacatBrowser" "UninstallString" '"$INSTDIR\Desinstalar.exe"'
+  WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\LavacatBrowser" "DisplayIcon" '"$INSTDIR\${ARCHIVO_ICONO}"'
+  WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\LavacatBrowser" "Publisher" "Lavacat Team"
+
+SectionEnd
+
+; --- SECCIÓN DE DESINSTALACIÓN PROFUNDA ---
+Section "Uninstall"
+
+  DetailPrint "Iniciando desinstalación completa..."
+
+  ; 1. Borrar llaves del registro de las extensiones y panel de control
+  DeleteRegKey HKLM "Software\Wow6432Node\Google\Chrome\Extensions\cjpalhdlnbpafiamejdnhcphjbkeiagm"
+  DeleteRegKey HKLM "Software\Wow6432Node\Google\Chrome\Extensions\pkehgijclgfghdconhihgpnofmmoofoa"
+  DeleteRegKey HKLM "Software\Wow6432Node\Google\Chrome\Extensions\jinjgcalioihgjonmglokifelgocgbeb"
+  DeleteRegKey HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\LavacatBrowser"
+
+  ; 2. Borrar accesos directos del escritorio y menú inicio
+  Delete "$DESKTOP\${NOMBRE_NAVEGADOR}.lnk"
+  Delete "$SMPROGRAMS\${NOMBRE_NAVEGADOR}.lnk"
+
+  ; 3. Destruir carpetas del perfil de usuario (historial, caché, extensiones)
+  RMDir /r "$LOCALAPPDATA\Thorium\User Data"
+  RMDir /r "$LOCALAPPDATA\Thorium"
+
+  ; 4. Borrar la carpeta de instalación principal elegida en su momento ($INSTDIR)
+  RMDir /r "$INSTDIR"
+
+  DetailPrint "¡El sistema ha quedado 100% limpio!"
+
+SectionEnd
